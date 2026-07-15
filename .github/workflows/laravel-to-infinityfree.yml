@@ -40,9 +40,6 @@ jobs:
       - name: Install Composer Dependencies
         run: |
           composer install --no-dev --optimize-autoloader
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
 
       # 4b. Setup Node.js dan Compile Aset (Tambahan untuk Laravel Breeze / Vite)
       - name: Setup Node.js
@@ -59,6 +56,10 @@ jobs:
       # Memindahkan isi folder 'public' Laravel ke folder 'htdocs' agar dibaca oleh server
       - name: Restructure for InfinityFree
         run: |
+          # 1. Hapus total isi folder bootstrap/cache bawaan local/runner
+          rm -rf bootstrap/cache/*.php
+
+          # 2. Buat folder deploy baru
           mkdir deploy_dir
           mv public/* deploy_dir/
           rm -rf public
