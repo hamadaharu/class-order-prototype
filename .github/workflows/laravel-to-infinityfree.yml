@@ -1,0 +1,76 @@
+name: Deploy Laravel to InfinityFree
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Ambil kode dari GitHub
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup PHP Environment
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Sesuaikan dengan versi PHP di InfinityFree Anda
+          extensions: mbstring, xml, ctype, iconv, json, pdo, pdo_mysql
+
+      # 3. Copy file .env khusus produksi
+      - name: Create ENV file
+        run: |
+          echo "APP_NAME=Laravel" > .env
+          echo "APP_ENV=production" >> .env
+          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
+          echo "APP_DEBUG=false" >> .env
+          echo "APP_URL=http://infinityfreeapp.com" >> .env
+          echo "DB_CONNECTION=mysql" >> .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+          echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.FTP_PASSWORD }}" >> .env
+
+      # 4. Install Vendor & Optimasi Laravel
+      - name: Install Composer Dependencies
+        run: |
+          composer install --no-dev --optimize-autoloader
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          
+      # 4b. Setup Node.js dan Compile Aset (Tambahan untuk Laravel Breeze / Vite)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22' # Sesuaikan dengan versi Node.js Anda
+
+      - name: Install NPM Dependencies & Build Assets
+        run: |
+          npm install
+          npm run build
+
+      # 5. Sesuaikan Struktur Folder untuk InfinityFree
+      # Memindahkan isi folder 'public' Laravel ke folder 'htdocs' agar dibaca oleh server
+      - name: Restructure for InfinityFree
+        run: |
+          mkdir deploy_dir
+          mv public/* deploy_dir/
+          rm -rf public
+          mv * deploy_dir/ 2>/dev/null || true
+          mv .env deploy_dir/ 2>/dev/null || true
+
+      # 6. Upload Semua File via FTP
+      - name: Sync Files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./deploy_dir/
+          server-dir: ./htdocs/
